@@ -38,3 +38,12 @@ To specify a different data directory:
 Then run:
 
     node index.js
+
+## Viewing the Data
+
+The data viewer that is included runs using TouchDesigner.  To open it, [download TouchDesigner.](https://derivative.ca/download)  The non-commercial, free edition
+will be sufficient to run this project.
+
+For it to run on the data files, you first need to run the script above to convert the data files to csv.
+
+Open the file DataViewer/DataViewer.toe in TouchDesigner, then press F1
