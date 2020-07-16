@@ -1,13 +1,14 @@
 const fs = require('fs');
 const { promisify } = require('util');
-const { join } = require('path');
+const { join, resolve } = require('path');
 
 const readdr = promisify(fs.readdir);
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 
 const getTargetDirectory = () => {
-    return process.env.DIR || __dirname;
+    const currentDir = resolve(__dirname, '..');
+    return process.env.DIR || currentDir;
 }
 
 const scanForColumnNames = (lines) => {
@@ -128,6 +129,8 @@ const main = async () => {
     const files = await readdr(targetDirectory);
 
     const textFiles = files.filter(x => x.endsWith('txt'));
+
+    console.log('processing files:', files, textFiles);
 
     textFiles.forEach(async textFile => {
         const fullPath = join(targetDirectory, textFile);
