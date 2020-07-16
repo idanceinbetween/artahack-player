@@ -7,7 +7,7 @@ const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 
 const getTargetDirectory = () => {
-    const currentDir = resolve(__dirname, '..');
+    const currentDir = resolve(__dirname, '../data');
     return process.env.DIR || currentDir;
 }
 
