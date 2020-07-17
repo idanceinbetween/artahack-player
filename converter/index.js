@@ -1,151 +1,157 @@
-const fs = require('fs');
-const { promisify } = require('util');
-const { join, resolve } = require('path');
+const fs = require("fs");
+const { promisify } = require("util");
+const { join, resolve } = require("path");
 
 const readdr = promisify(fs.readdir);
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 
 const getTargetDirectory = () => {
-    const currentDir = resolve(__dirname, '../data');
-    return process.env.DIR || currentDir;
-}
+  const currentDir = resolve(__dirname, "../data");
+  return process.env.DIR || currentDir;
+};
 
 const scanForColumnNames = (lines) => {
-    const allColumnNames = new Set();
-    for (let line of lines) {
-        const cells = line.split(' ');
-        const cellsAfterFrame = cells.slice(2);
+  const allColumnNames = new Set();
+  for (let line of lines) {
+    const cells = line.split(" ");
+    const cellsAfterFrame = cells.slice(2);
 
-        const columnNames = cellsAfterFrame.filter(x => x.startsWith('/'));
+    const columnNames = cellsAfterFrame.filter((x) => x.startsWith("/"));
 
-        columnNames.forEach(columnName => allColumnNames.add(columnName));
-    }
+    columnNames.forEach((columnName) => allColumnNames.add(columnName));
+  }
 
-    return allColumnNames;
-}
+  return allColumnNames;
+};
 
 const convertFileToColumns = async (filePath) => {
-    const fileContents = await readFile(filePath, 'utf8');
+  const fileContents = await readFile(filePath, "utf8");
 
-    const lines = fileContents.split('\n');
+  const lines = fileContents.split("\n");
 
-    const columnNames = scanForColumnNames(lines);
+  const columnNames = scanForColumnNames(lines);
 
-    console.log(columnNames)
+  console.log(columnNames);
 
-    const columns = {
-    };
+  const columns = {};
 
+  const numberOfFrames = +lines[lines.length - 2].split(" ")[1];
 
-    const numberOfFrames = +(lines[lines.length-2].split(' ')[1])
+  const columnEmptyFrames = [];
+  for (let i = 0; i < numberOfFrames; i++) {
+    columnEmptyFrames.push(null);
+  }
 
-    const columnEmptyFrames = [];
-    for (let i = 0; i < numberOfFrames; i++ ) {
-        columnEmptyFrames.push(null);
-    }
+  columnNames.forEach((columnName) => {
+    columns[columnName] = columnEmptyFrames.slice();
+  });
 
-    columnNames.forEach(columnName => {
-        columns[columnName] = columnEmptyFrames.slice();
-    })
+  lines.forEach((line) => {
+    const entries = line.replace("\r", "").split(" ");
 
+    const frameIndex = +entries[1] - 1;
 
-    lines.forEach(line => {
-        const entries = line.replace('\r', '').split(' ');
+    columnNames.forEach((columnName) => {
+      const columnIndex = entries.indexOf(columnName);
+      if (columnIndex >= 0) {
+        let endingColumnIndex;
 
-        const frameIndex = +entries[1] - 1;
+        for (let i = columnIndex + 1; i < entries.length; i++) {
+          if (entries[i].startsWith("/")) {
+            break;
+          }
 
-        columnNames.forEach(columnName => {
-            const columnIndex = entries.indexOf(columnName);
-            if (columnIndex >= 0) {
-                let endingColumnIndex;
+          endingColumnIndex = i;
+        }
 
-                for(let i = columnIndex + 1; i < entries.length; i++) {
-                    if (entries[i].startsWith('/')) {
-                        break;
-                    }
-                    
-                    endingColumnIndex = i;
-                }
+        const dataForEntry = entries.slice(
+          columnIndex + 1,
+          endingColumnIndex + 1
+        );
 
-                const dataForEntry = entries.slice(columnIndex + 1, endingColumnIndex + 1);
+        columns[columnName][frameIndex] = dataForEntry.map((x) => +x);
+      }
+    });
+  });
 
-                columns[columnName][frameIndex] = dataForEntry.map(x => +x);
-            }
-        });
-    })
-
-    return columns;
-}
+  return columns;
+};
 
 const convertToOnlyContainLastValue = (columns) => {
-    return Object.entries(columns).reduce((acc, [columnName, values]) => {
-        acc[columnName] = values.map(valuesArray => {
-            if (!valuesArray) return null;
+  return Object.entries(columns).reduce((acc, [columnName, values]) => {
+    acc[columnName] = values.map((valuesArray) => {
+      if (!valuesArray) return null;
 
-            return valuesArray[valuesArray.length-1];
-        })
+      return valuesArray[valuesArray.length - 1];
+    });
 
-        return acc;
-    }, {});
-}
+    return acc;
+  }, {});
+};
 
 const fillSparse = (columns) => {
-    return Object.entries(columns).reduce((acc, [columnName, values]) => {
-        let lastValue = 0;
-        acc[columnName] = values.map(value => {
-            if (!value) return lastValue;
-            lastValue = value;
-            return value;
-        })
+  return Object.entries(columns).reduce((acc, [columnName, values]) => {
+    let lastValue = 0;
+    acc[columnName] = values.map((value) => {
+      if (!value) return lastValue;
+      lastValue = value;
+      return value;
+    });
 
-        return acc;
-    }, {});
-}
+    return acc;
+  }, {});
+};
 
-
-const DELIMITER = ' ';
+const DELIMITER = " ";
 const convertToCsv = (columns) => {
-    const columnNames = Object.keys(columns);
+  const columnNames = Object.keys(columns);
 
+  const numberOfRows = columns[columnNames[0]].length;
 
-    const numberOfRows = columns[columnNames[0]].length;
+  const result = [];
+  result.push(columnNames);
 
-    const result = [];
-    result.push(columnNames);
+  for (let rowIndex = 0; rowIndex < numberOfRows; rowIndex++) {
+    const rowContents = columnNames.map(
+      (columnName) => columns[columnName][rowIndex]
+    );
 
-    for (let rowIndex = 0; rowIndex < numberOfRows; rowIndex++) {
-        const rowContents = columnNames.map(columnName => columns[columnName][rowIndex]);
+    result.push(rowContents);
+  }
 
-        result.push(rowContents);
-    }
-
-    return result.map(row => row.join(DELIMITER)).join('\n');
-}
+  return result.map((row) => row.join(DELIMITER)).join("\n");
+};
 
 const main = async () => {
-    const targetDirectory = getTargetDirectory();
+  const targetDirectory = getTargetDirectory();
 
-    const files = await readdr(targetDirectory);
+  const files = await readdr(targetDirectory);
 
-    const textFiles = files.filter(x => x.endsWith('txt'));
+  const textFiles = files.filter((x) => x.endsWith("txt"));
 
-    console.log('processing files:', files, textFiles);
+  console.log("processing files:", textFiles);
 
-    textFiles.forEach(async textFile => {
-        const fullPath = join(targetDirectory, textFile);
-        const asColumns = await convertFileToColumns(textFile, fullPath, targetDirectory);
+  textFiles.forEach(async (textFile) => {
+    const fullPath = join(targetDirectory, textFile);
+    const asColumns = await convertFileToColumns(fullPath);
 
-        const withLastValueOnly = convertToOnlyContainLastValue(asColumns);
+    const withLastValueOnly = convertToOnlyContainLastValue(asColumns);
 
-        const fileName = textFile.split('.')[0];
+    const fileName = textFile.split(".")[0];
 
-        await writeFile(`${fileName}_sparse.csv`, convertToCsv(withLastValueOnly));
+    await writeFile(
+      join(targetDirectory, `${fileName}_sparse.csv`),
+      convertToCsv(withLastValueOnly)
+    );
 
-        const withSparseFilled = fillSparse(withLastValueOnly);
+    const withSparseFilled = fillSparse(withLastValueOnly);
 
-        await writeFile(`${fileName}.csv`, convertToCsv(withSparseFilled));
-    });
+    await writeFile(
+      join(targetDirectory, `${fileName}.csv`),
+      convertToCsv(withSparseFilled)
+    );
+  });
 };
 
 main();
