@@ -2,3 +2,4 @@ node_modules
 *.csv
 *.txt
 bundles
+package-lock.json
