@@ -6,12 +6,7 @@ const readdr = promisify(fs.readdir);
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 
-const getTargetDirectory = () => {
-  const currentDir = resolve(__dirname, "../data");
-  return process.env.DIR || currentDir;
-};
-
-const scanForColumnNames = (lines) => {
+const scanForColumnNamesExcFrame = (lines) => {
   const allColumnNames = new Set();
   for (let line of lines) {
     const cells = line.split(" ");
@@ -30,9 +25,7 @@ const convertFileToColumns = async (filePath) => {
 
   const lines = fileContents.split("\n");
 
-  const columnNames = scanForColumnNames(lines);
-
-  console.log(columnNames);
+  const columnNames = scanForColumnNamesExcFrame(lines);
 
   const columns = {};
 
@@ -103,6 +96,17 @@ const fillSparse = (columns) => {
   }, {});
 };
 
+const prepareFiles = async () => {
+  const targetDirectory = process.env.DIR
+    ? process.env.DIR
+    : resolve(__dirname, "../data");
+
+  const files = await readdr(targetDirectory);
+
+  const textFiles = files.filter((x) => x.endsWith("txt"));
+  return { targetDirectory, textFiles };
+};
+
 const DELIMITER = " ";
 const convertToCsv = (columns) => {
   const columnNames = Object.keys(columns);
@@ -122,36 +126,31 @@ const convertToCsv = (columns) => {
 
   return result.map((row) => row.join(DELIMITER)).join("\n");
 };
+const createCsv = async (targetDirectory, fileName, preparedValues) => {
+  await writeFile(
+    join(targetDirectory, `${fileName}.csv`),
+    convertToCsv(preparedValues)
+  );
+};
 
 const main = async () => {
-  const targetDirectory = getTargetDirectory();
-
-  const files = await readdr(targetDirectory);
-
-  const textFiles = files.filter((x) => x.endsWith("txt"));
+  const { targetDirectory, textFiles } = await prepareFiles();
 
   console.log("processing files:", textFiles);
 
-  textFiles.forEach(async (textFile) => {
+  for (const textFile of textFiles) {
     const fullPath = join(targetDirectory, textFile);
-    const asColumns = await convertFileToColumns(fullPath);
-
-    const withLastValueOnly = convertToOnlyContainLastValue(asColumns);
-
     const fileName = textFile.split(".")[0];
 
-    await writeFile(
-      join(targetDirectory, `${fileName}_sparse.csv`),
-      convertToCsv(withLastValueOnly)
-    );
+    const asColumns = await convertFileToColumns(fullPath);
 
-    const withSparseFilled = fillSparse(withLastValueOnly);
+    const withLastValueOnlySparsed = convertToOnlyContainLastValue(asColumns);
 
-    await writeFile(
-      join(targetDirectory, `${fileName}.csv`),
-      convertToCsv(withSparseFilled)
-    );
-  });
+    await createCsv(targetDirectory, `${fileName}_sparse`, withLastValueOnlySparsed);
+
+    const withSparseFilledV2 = fillSparse(withLastValueOnlySparsed);
+    await createCsv(targetDirectory, `${fileName}_filled`, withSparseFilledV2);
+  }
 };
 
 main();
