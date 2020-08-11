@@ -2,14 +2,15 @@
 
 Tools for playing back Emotibit data, for Art a Hack
 
-## Convert Recorded Data to CSV
+## Convert Recorded Data in TXT to CSV
 
-The folder in `converter` contains code to convert to csv.
+The folder in `converter` contains code to convert data recorded in txt to csv.
 
 For each text data file in a directory, creates 2 csvs:
 
-* <filename>_sparse.csv - values for each sensor indexed by frame.  If values are missing will have null
-* <filename>.csv - values for each sensor indexed by frame.  If values are missing use the last value
+* `<filename>_sparse.csv` (v1) - values for each sensor indexed by frame.  If values are missing will have null. Delimiter is blank space. Columns do not include frame number.
+* `<filename>_filled.csv` (v2) - values for each sensor indexed by frame.  If values are missing use the last value. Delimiter is blank space. Columns do not include frame number.
+* `<filename>_withFrame.csv` (v3) - values for each sensor indexed by frame.  If values are missing use the last value. Delimiter is comma. Columns include frame number.
 
 #### Setup
 
@@ -18,10 +19,9 @@ For each text data file in a directory, creates 2 csvs:
     npm install
 
 #### Run
+Make a directory `data` and put the `txt` files in it. Then, to convert them to CSVs: 
 
     cd converter
-
-To create CSVs from all text files in the `./data` directory:
 
     node index.js
 
